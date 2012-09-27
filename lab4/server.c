@@ -7,23 +7,43 @@
 #include <signal.h>
 #include <errno.h>
 #include <readline/readline.h>
+#include <math.h>
+
+int num_files = 0;
+int total_time = 0;
+pthread_mutex_t stats_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void sig_handler(int signum, siginfo_t *si, void * nu){
     if(signum == SIGINT){
+        printf("\n%d files accessed, with %f(s) average access time.\n",
+                num_files, (double)total_time / num_files);
         exit(0);
     }
 }
 
 void * worker(void * arg){
     char * file = (char*) arg;
-    sleep(10);
-    puts(file);
+    double num = (double)rand() / RAND_MAX;
+    int twait = 10;
+    if(num <= 0.8){
+        twait = 1;
+    } else {
+        num = (double)rand() / RAND_MAX;
+        twait = round(7.0 + 3.0 * num);
+    }
+    sleep(twait);
+    printf("%s read in %d seconds\n",file,twait);
 
+    pthread_mutex_lock(&stats_mutex);
+    num_files++;
+    total_time += twait;
+    pthread_mutex_unlock(&stats_mutex);
     free(file);
     return NULL;
 }
 
 int main(int argc, char *argv[]){
+    srand(time(NULL));
     //main thread is dispatcher
     struct sigaction sa;
     sa.sa_sigaction = sig_handler;
@@ -33,18 +53,13 @@ int main(int argc, char *argv[]){
         exit(1);
     }
 
-    pthread_t *threads = malloc(sizeof(pthread_t) * 10);
-    int active_threads = 0, max_threads = 10;
     while(1){
-        char *file = readline("");
-        if(active_threads == max_threads){
-            max_threads = (max_threads * 3) / 2 + 5;
-            threads = realloc(threads, sizeof(pthread_t) * max_threads);
-        }
-        if(pthread_create(threads + active_threads++, NULL, worker, file) == -1){
+        char *file = readline("> ");
+        pthread_t newthread;
+        if(pthread_create(&newthread, NULL, worker, file) == -1){
             perror("worker create");
             exit(1);
         }
     }
     return 0;
-}
+    }
