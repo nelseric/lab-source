@@ -60,6 +60,7 @@ int main(int argc, char *argv[]){
             perror("worker create");
             exit(1);
         }
+        pthread_detach(newthread);
     }
     return 0;
     }
