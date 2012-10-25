@@ -6,11 +6,11 @@ CFLAGS=-std=c99 $(DBGFLAG) -Wall $(OPTFLAG) $(PROGOPTS)
 LDLIBS=
 LDFLAGS=$(DBGFLAG) $(OPTFLAG)
 
-SOURCES=semsample.c
+SOURCES=sem.c
 
 OBJECTS=$(SOURCES:.c=.o)
 
-TARGET=semsample
+TARGET=swap
 
 
 .PHONY : clean 

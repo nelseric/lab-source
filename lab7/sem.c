@@ -23,6 +23,7 @@ int main (int argc, char *argv[])
         loop = atol(argv[1]);
     } else {
         puts("Invalid Usage");
+        exit(1);
     }
 
     if((shmId = shmget(IPC_PRIVATE, SIZE, IPC_CREAT|S_IRUSR|S_IWUSR)) < 0) {
@@ -33,32 +34,20 @@ int main (int argc, char *argv[])
         perror ("can't attach\n");
         exit (1);
     }
-    if((semid = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600)) == -1) {
+
+    if((semid = semget(IPC_PRIVATE, 1, 00600)) == -1) {
         perror("semget");
-        if (shmdt (shmPtr) < 0) {
-            perror ("just can't let go\n");
-            exit (1);
-        }
-        if (shmctl (shmId, IPC_RMID, 0) < 0) {
-            perror ("can't deallocate\n");
-            exit(1);
-        }
-        exit(1);
-    }
-    if(semctl(semid, SETVAL, 1) == -1){
-        perror("semop setval 1");
         exit(1);
     }
 
-    struct sembuf semwait;
-    semwait.sem_num = 0;
-    semwait.sem_op = -1;
-    semwait.sem_flg = 0;
+    if(semctl(semid, 0, SETVAL, 1) == -1){
+        perror("semctl setval 1");
+        exit(1);
+    }
 
-    struct sembuf semsignal;
-    semsignal.sem_num = 0;
-    semsignal.sem_op = 1;
-    semsignal.sem_flg = 0;
+    struct sembuf sem_wait = {0, -1, 0};
+
+    struct sembuf sem_sig = {0, 1,0};
 
     shmPtr[0] = 0;
     shmPtr[1] = 1;
@@ -66,11 +55,17 @@ int main (int argc, char *argv[])
     if (!(pid = fork())) {
         for (i=0; i<loop; i++) {
             // swap the contents of shmPtr[0] and shmPtr[1]
-            semop(semid, &semwait, 1);
+            if(semop(semid, &sem_wait, 1) == -1){
+                perror("sem_wait");
+                exit(1);
+            }
             temp = shmPtr[0];
             shmPtr[0] = shmPtr[1];
             shmPtr[1] = temp;
-            semop(semid, &semsignal, 1);
+            if(semop(semid, &sem_sig, 1) == -1){
+                perror("sem_wait");
+                exit(1);
+            }
         }
         if (shmdt (shmPtr) < 0) {
             perror ("just can't let go\n");
@@ -81,11 +76,17 @@ int main (int argc, char *argv[])
     else
         for (i=0; i<loop; i++) {
             // swap the contents of shmPtr[1] and shmPtr[0]
-            semop(semid, &semwait, 1);
+            if(semop(semid, &sem_wait, 1) == -1){
+                perror("sem_wait");
+                exit(1);
+            }
             temp = shmPtr[0];
             shmPtr[0] = shmPtr[1];
             shmPtr[1] = temp;
-            semop(semid, &semsignal, 1);
+            if(semop(semid, &sem_sig, 1) == -1){
+                perror("sem_wait");
+                exit(1);
+            }
         }
 
     wait (&status);
