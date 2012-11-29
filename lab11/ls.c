@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -13,6 +14,7 @@
 int main(int argc, char *argv[])
 {
     int flags = 0, opt;
+    char * dirname = ".";
     while((opt = getopt(argc, argv, "siF")) != -1){
         switch(opt) {
             case 's':
@@ -31,39 +33,47 @@ int main(int argc, char *argv[])
                 exit(1);
         }
     }
-    printf("%d\n", flags);
+    if(optind < argc){
+        dirname = argv[optind];
+    }
     DIR *dirPtr;
     struct dirent *entryPtr;
     struct stat stbuf;
 
-    dirPtr = opendir (".");
-
+    if((dirPtr = opendir(dirname)) == NULL){
+        perror(dirname);
+        exit(1);
+    }
+    char rel_fname[4096];
     while ((entryPtr = readdir (dirPtr))){
-        if(stat(entryPtr->d_name, &stbuf) < 0){
+        strcpy(rel_fname, dirname);
+        strcat(rel_fname, "/");
+        strcat(rel_fname, entryPtr->d_name);
+        if(stat(rel_fname, &stbuf) < 0){
             perror(entryPtr->d_name);
             exit(1);
         }
         if(flags & 1<<OPT_INODE){
-            printf("%d\t", (unsigned int)stbuf.st_ino);
+            printf("%lu\t", (unsigned long)stbuf.st_ino);
         }
         if(flags & 1<<OPT_SIZE){
             printf("%lu\t", (unsigned long)stbuf.st_blocks);
         }
         int cchar = ' ';
-        if(S_ISREG(stbuf.st_mode))
-            cchar = ' ';
-        else if(S_ISDIR(stbuf.st_mode))
-            cchar = '/';
-        else if(S_ISLNK(stbuf.st_mode))
-            cchar = '@';
-        else if(S_ISFIFO(stbuf.st_mode))
-            cchar = '|';
-        else if(stbuf.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+        //if(S_ISREG(stbuf.st_mode))
+        //    cchar = ' ';
+        //else
+        if(stbuf.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
             cchar = '*';
+        if(S_ISDIR(stbuf.st_mode))
+            cchar = '/';
+        if(S_ISLNK(stbuf.st_mode))
+            cchar = '@';
+        if(S_ISFIFO(stbuf.st_mode))
+            cchar = '|';
 
         printf("%s%c\n", entryPtr->d_name, cchar);
     }
-
     closedir (dirPtr);
     return 0;
 } 
